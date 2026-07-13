@@ -1,0 +1,1685 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "chethandevADF"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/TeritorySink_DS')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"date": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": {
+							"value": "Processed/Territory/@{formatDateTime(dataset().date,'yyyy')}/@{formatDateTime(dataset().date,'MM')}/@{formatDateTime(dataset().date,'dd')}",
+							"type": "Expression"
+						},
+						"fileSystem": "globle"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Teritory_DS')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"date": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": {
+							"value": "Raw/Territory/@{formatDateTime(dataset().date,'yyyy')}/@{formatDateTime(dataset().date,'MM')}/@{formatDateTime(dataset().date,'dd')}",
+							"type": "Expression"
+						},
+						"fileSystem": "globle"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/prod_sinkDS')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"ProSinkDate": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": {
+							"value": "Processed/Product_Category/@{formatDateTime(dataset().ProSinkDate,'yyyy')}/@{formatDateTime(dataset().ProSinkDate,'MM')}/@{formatDateTime(dataset().ProSinkDate,'dd')}",
+							"type": "Expression"
+						},
+						"fileSystem": "globle"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": [
+					{
+						"name": "emp_id",
+						"type": "String"
+					},
+					{
+						"name": "Name",
+						"type": "String"
+					},
+					{
+						"name": "contact",
+						"type": "String"
+					},
+					{
+						"name": "Location",
+						"type": "String"
+					},
+					{
+						"name": "Designation",
+						"type": "String"
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Sql2Raw')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Lookup1",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT * FROM Metadata \nWHERE Status <> 'Succeeded'",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "AzureSqlTable1",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "ForEach1",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Lookup1",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Lookup1').output.value",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Copy data1",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "AzureSqlSource",
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"quoteAllText": true,
+												"fileExtension": ".txt"
+											}
+										},
+										"enableStaging": false,
+										"parallelCopies": 1,
+										"dataIntegrationUnits": 4,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "AzureSql_TablesDS",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema_name": {
+													"value": "dbo",
+													"type": "Expression"
+												},
+												"Table_name": {
+													"value": "@item().Source",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_GEN2_Raw",
+											"type": "DatasetReference",
+											"parameters": {
+												"TablePath": {
+													"value": "@item().Storepath",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "Success_Stored procedure1",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [
+										{
+											"activity": "Copy data1",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[[dbo].[meta_status]",
+										"storedProcedureParameters": {
+											"satus": {
+												"value": "Successed",
+												"type": "String"
+											},
+											"Source": {
+												"value": {
+													"value": "@item().Source",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "AzureSqlDatabase_LS",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "Failed_Stored procedure1_copy1",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [
+										{
+											"activity": "Copy data1",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[[dbo].[meta_status]",
+										"storedProcedureParameters": {
+											"satus": {
+												"value": "Failed",
+												"type": "String"
+											},
+											"Source": {
+												"value": {
+													"value": "@item().Source",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "AzureSqlDatabase_LS",
+										"type": "LinkedServiceReference"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "Stored procedure1",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "ForEach1",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[dbo].[resetValue]",
+							"storedProcedureParameters": {
+								"Statu": {
+									"value": "ready",
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureSqlDatabase_LS",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-07-09T10:40:23Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Proc2Refind_dataflow')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"folder": {
+					"name": "Sql2Blob_ETL"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "SalesProc2Refin_DS",
+								"type": "DatasetReference"
+							},
+							"name": "sourceSales"
+						},
+						{
+							"dataset": {
+								"referenceName": "TeritoryProc2Refind_DS",
+								"type": "DatasetReference"
+							},
+							"name": "sourceTeritory"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "Proc2Refind_DS",
+								"type": "DatasetReference"
+							},
+							"name": "sink2Ref"
+						}
+					],
+					"transformations": [
+						{
+							"name": "LeftjoinSales2Teritory"
+						},
+						{
+							"name": "selectandRemove"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          OrderDate as date,",
+						"          QTY as short,",
+						"          Sales as short,",
+						"          TerritoryKey as short,",
+						"          Total_Sales as double",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> sourceSales",
+						"source(output(",
+						"          SalesTerritoryKey as short,",
+						"          Region as string,",
+						"          Country as string,",
+						"          Continent as string,",
+						"          Surrogate_key as short",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> sourceTeritory",
+						"sourceSales, sourceTeritory join(TerritoryKey == SalesTerritoryKey,",
+						"     joinType:'left',",
+						"     matchType:'exact',",
+						"     ignoreSpaces: false,",
+						"     broadcast: 'auto')~> LeftjoinSales2Teritory",
+						"LeftjoinSales2Teritory select(mapColumn(",
+						"          OrderDate,",
+						"          QTY,",
+						"          Sales,",
+						"          Total_Sales,",
+						"          SalesTerritoryKey,",
+						"          Region,",
+						"          Country,",
+						"          Continent",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> selectandRemove",
+						"selectandRemove sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     filePattern:(toString((currentDate('utc')))),",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     mapColumn(",
+						"          OrderDate,",
+						"          QTY,",
+						"          Sales,",
+						"          Total_Sales,",
+						"          SalesTerritoryKey,",
+						"          Region,",
+						"          Country,",
+						"          Continent",
+						"     )) ~> sink2Ref"
+					]
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Raw2proces_Territorry')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"folder": {
+					"name": "Sql2Blob_ETL"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "Teritory_DS",
+								"type": "DatasetReference"
+							},
+							"name": "SourceTeritory"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "TeritorySink_DS",
+								"type": "DatasetReference"
+							},
+							"name": "sinkTeritory"
+						}
+					],
+					"transformations": [],
+					"scriptLines": [
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> SourceTeritory",
+						"SourceTeritory sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> sinkTeritory"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/Teritory_DS')]",
+				"[concat(variables('factoryId'), '/datasets/TeritorySink_DS')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Raw2proces_procd')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"folder": {
+					"name": "Sql2Blob_ETL"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "Prod_source_DS",
+								"type": "DatasetReference"
+							},
+							"name": "SourceProduct"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "prod_sinkDS",
+								"type": "DatasetReference"
+							},
+							"name": "sinkProduct"
+						}
+					],
+					"transformations": [],
+					"scriptLines": [
+						"source(output(",
+						"          ProductCategoryKey as short,",
+						"          CategoryName as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> SourceProduct",
+						"SourceProduct sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          emp_id as string,",
+						"          Name as string,",
+						"          contact as string,",
+						"          Location as string,",
+						"          Designation as string",
+						"     ),",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> sinkProduct"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/prod_sinkDS')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Raw2proces_sales')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"folder": {
+					"name": "Sql2Blob_ETL"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "Raw2proc_SalesDS",
+								"type": "DatasetReference"
+							},
+							"name": "SourceSales"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "SalesSink_DS",
+								"type": "DatasetReference"
+							},
+							"name": "sinksales"
+						}
+					],
+					"transformations": [
+						{
+							"name": "derivedColumnSales"
+						},
+						{
+							"name": "selectRemoveUnwanted"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          OrderDate as date,",
+						"          StockDate as date,",
+						"          OrderNumber as integer,",
+						"          QTY as short,",
+						"          Sales as integer,",
+						"          TerritoryKey as short,",
+						"          OrderLineItem as boolean,",
+						"          OrderQuantity as boolean",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> SourceSales",
+						"SourceSales derive(Total_Sales = toFloat(multiply(QTY, Sales))) ~> derivedColumnSales",
+						"derivedColumnSales select(mapColumn(",
+						"          OrderDate,",
+						"          QTY,",
+						"          Sales,",
+						"          TerritoryKey,",
+						"          Total_Sales",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> selectRemoveUnwanted",
+						"selectRemoveUnwanted sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     mapColumn(",
+						"          OrderDate,",
+						"          QTY,",
+						"          Sales,",
+						"          TerritoryKey,",
+						"          Total_Sales",
+						"     )) ~> sinksales"
+					]
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCD_TYPE1')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"folder": {
+					"name": "SCD"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "DS_Storage",
+								"type": "DatasetReference"
+							},
+							"name": "source"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "AzureSql_DS",
+								"type": "DatasetReference"
+							},
+							"name": "sink1"
+						}
+					],
+					"transformations": [
+						{
+							"name": "surrogateKey"
+						},
+						{
+							"name": "alterRow1"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          SalesTerritoryKey as integer,",
+						"          Region as string,",
+						"          Country as string,",
+						"          Continent as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> source",
+						"source keyGenerate(output(Surrogate_key as long),",
+						"     startAt: 1L,",
+						"     stepValue: 1L) ~> surrogateKey",
+						"surrogateKey alterRow(upsertIf(true())) ~> alterRow1",
+						"alterRow1 sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          SalesTerritoryKey as integer,",
+						"          Region as string,",
+						"          Country as string,",
+						"          Continent as string",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:false,",
+						"     updateable:false,",
+						"     upsertable:true,",
+						"     keys:['SalesTerritoryKey'],",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError') ~> sink1"
+					]
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCD_TYPE1_SURROGATE')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"folder": {
+					"name": "SCD"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "DS_Storage",
+								"type": "DatasetReference"
+							},
+							"name": "FactTablesource"
+						},
+						{
+							"dataset": {
+								"referenceName": "AzureSql_DS",
+								"type": "DatasetReference"
+							},
+							"name": "Maxvalue"
+						},
+						{
+							"dataset": {
+								"referenceName": "AzureSql_DS",
+								"type": "DatasetReference"
+							},
+							"name": "DimentionTable"
+						}
+					],
+					"sinks": [
+						{
+							"name": "sink1"
+						},
+						{
+							"dataset": {
+								"referenceName": "AzureSql_DS",
+								"type": "DatasetReference"
+							},
+							"name": "sink2DW"
+						}
+					],
+					"transformations": [
+						{
+							"name": "RenameSource"
+						},
+						{
+							"name": "LeftJoin1"
+						},
+						{
+							"name": "UpdateRecords"
+						},
+						{
+							"name": "NewRecords"
+						},
+						{
+							"name": "surrogateKey1"
+						},
+						{
+							"name": "updatedSurrogatekey"
+						},
+						{
+							"name": "RenameNewRecord"
+						},
+						{
+							"name": "RenameUpdateRecords"
+						},
+						{
+							"name": "unionAll"
+						},
+						{
+							"name": "alterRow1"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          SalesTerritoryKey as integer,",
+						"          Region as string,",
+						"          Country as string,",
+						"          Continent as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> FactTablesource",
+						"source(output(",
+						"          maxvalue as integer",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: 'SELECT MAX(Surrogate_key) as maxvalue from Territory',",
+						"     format: 'query') ~> Maxvalue",
+						"source(output(",
+						"          SalesTerritoryKey as integer,",
+						"          Region as string,",
+						"          Country as string,",
+						"          Continent as string,",
+						"          Surrogate_key as integer",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> DimentionTable",
+						"FactTablesource select(mapColumn(",
+						"          Scr_SalesTerritoryKey = SalesTerritoryKey,",
+						"          Scr_Region = Region,",
+						"          Scr_Country = Country,",
+						"          Scr_Continent = Continent",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> RenameSource",
+						"RenameSource, DimentionTable join(Scr_SalesTerritoryKey == SalesTerritoryKey,",
+						"     joinType:'left',",
+						"     matchType:'exact',",
+						"     ignoreSpaces: false,",
+						"     broadcast: 'auto')~> LeftJoin1",
+						"LeftJoin1 filter(not(isNull(SalesTerritoryKey))) ~> UpdateRecords",
+						"LeftJoin1 filter(isNull(SalesTerritoryKey)) ~> NewRecords",
+						"NewRecords keyGenerate(output(Surrogate_key as long),",
+						"     startAt: 1L,",
+						"     stepValue: 1L) ~> surrogateKey1",
+						"surrogateKey1 derive(Surrogate_key = case(isNull(sink1#outputs()[1].maxvalue),0,toInteger(sink1#outputs()[1].maxvalue+Surrogate_key))) ~> updatedSurrogatekey",
+						"updatedSurrogatekey select(mapColumn(",
+						"          SalesTerritoryKey = Scr_SalesTerritoryKey,",
+						"          Region = Scr_Region,",
+						"          Country = Scr_Country,",
+						"          Continent = Scr_Continent,",
+						"          Surrogate_key",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> RenameNewRecord",
+						"UpdateRecords select(mapColumn(",
+						"          SalesTerritoryKey = Scr_SalesTerritoryKey,",
+						"          Region = Scr_Region,",
+						"          Country = Scr_Country,",
+						"          Continent = Scr_Continent,",
+						"          Surrogate_key",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> RenameUpdateRecords",
+						"RenameUpdateRecords, RenameNewRecord union(byName: false)~> unionAll",
+						"unionAll alterRow(upsertIf(1==1)) ~> alterRow1",
+						"Maxvalue sink(validateSchema: false,",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     store: 'cache',",
+						"     format: 'inline',",
+						"     output: false,",
+						"     saveOrder: 0,",
+						"     mapColumn(",
+						"          maxvalue",
+						"     )) ~> sink1",
+						"alterRow1 sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          SalesTerritoryKey as integer,",
+						"          Region as string,",
+						"          Country as string,",
+						"          Continent as string",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:false,",
+						"     updateable:false,",
+						"     upsertable:true,",
+						"     keys:['Surrogate_key'],",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError') ~> sink2DW"
+					]
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCD_TYPE2_Surrogatekey')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"folder": {
+					"name": "SCD"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "SCD_Type2_GenDS",
+								"type": "DatasetReference"
+							},
+							"name": "FactTable"
+						},
+						{
+							"dataset": {
+								"referenceName": "SCDtype2Sql_DS",
+								"type": "DatasetReference"
+							},
+							"name": "DimentionTable"
+						},
+						{
+							"dataset": {
+								"referenceName": "SCDtype2Sql_DS",
+								"type": "DatasetReference"
+							},
+							"name": "DesMaxvalue"
+						}
+					],
+					"sinks": [
+						{
+							"name": "sinkMax"
+						},
+						{
+							"dataset": {
+								"referenceName": "SCDtype2Sql_DS",
+								"type": "DatasetReference"
+							},
+							"name": "sinkNew"
+						},
+						{
+							"dataset": {
+								"referenceName": "SCDtype2Sql_DS",
+								"type": "DatasetReference"
+							},
+							"name": "sinkcloseRecord"
+						},
+						{
+							"dataset": {
+								"referenceName": "SCDtype2Sql_DS",
+								"type": "DatasetReference"
+							},
+							"name": "sinkupdateRecord"
+						}
+					],
+					"transformations": [
+						{
+							"name": "RenameScr"
+						},
+						{
+							"name": "leftJoin1"
+						},
+						{
+							"name": "split1"
+						},
+						{
+							"name": "RenameNewRow"
+						},
+						{
+							"name": "LeftJoin2"
+						},
+						{
+							"name": "split2"
+						},
+						{
+							"name": "Removecloser"
+						},
+						{
+							"name": "Columncloser"
+						},
+						{
+							"name": "alterRow1"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          emp_id as integer,",
+						"          Name as string,",
+						"          desginaion as string,",
+						"          contact as string,",
+						"          Location as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> FactTable",
+						"source(output(",
+						"          SCD_Key as integer,",
+						"          emp_id as integer,",
+						"          Name as string,",
+						"          contact as long,",
+						"          Location as string,",
+						"          isactive as integer,",
+						"          Fromdate as date,",
+						"          Todate as date,",
+						"          Designation as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: 'SELECT * FROM Employee WHERE \\nisactive=1',",
+						"     format: 'query') ~> DimentionTable",
+						"source(output(",
+						"          max as integer",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: 'SELECT max(SCD_key) as max FROM Employee',",
+						"     format: 'query') ~> DesMaxvalue",
+						"FactTable select(mapColumn(",
+						"          Scr_emp_id = emp_id,",
+						"          Scr_Name = Name,",
+						"          Scr_desginaion = desginaion,",
+						"          Scr_contact = contact,",
+						"          Scr_Location = Location",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> RenameScr",
+						"RenameScr, DimentionTable join(Scr_emp_id == emp_id,",
+						"     joinType:'left',",
+						"     matchType:'exact',",
+						"     ignoreSpaces: false,",
+						"     broadcast: 'right')~> leftJoin1",
+						"leftJoin1 split(Scr_emp_id==emp_id,",
+						"     disjoint: false) ~> split1@(oldRecord, NewRecord)",
+						"split1@NewRecord select(mapColumn(",
+						"          emp_id = Scr_emp_id,",
+						"          Name = Scr_Name,",
+						"          desginaion = Scr_desginaion,",
+						"          contact = Scr_contact,",
+						"          Location = Scr_Location",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> RenameNewRow",
+						"split1@oldRecord, DimentionTable join(Scr_emp_id == DimentionTable@emp_id",
+						"     && Scr_Location == DimentionTable@Location,",
+						"     joinType:'left',",
+						"     matchType:'exact',",
+						"     ignoreSpaces: false,",
+						"     broadcast: 'right')~> LeftJoin2",
+						"LeftJoin2 split(Scr_Location==DimentionTable@Location,",
+						"     disjoint: false) ~> split2@(Oldmatching, Oldnotmatching)",
+						"Columncloser select(mapColumn(",
+						"          isactive,",
+						"          Todate,",
+						"          SCD_Key = split2@Oldnotmatching@SCD_Key",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> Removecloser",
+						"split2@Oldnotmatching derive(isactive = 0,",
+						"          Todate = currentDate('UIT')) ~> Columncloser",
+						"Removecloser alterRow(updateIf(true())) ~> alterRow1",
+						"DesMaxvalue sink(validateSchema: false,",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     store: 'cache',",
+						"     format: 'inline',",
+						"     output: false,",
+						"     saveOrder: 1) ~> sinkMax",
+						"RenameNewRow sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          SCD_Key as integer,",
+						"          emp_id as integer,",
+						"          Name as string,",
+						"          contact as long,",
+						"          Location as string,",
+						"          isactive as integer,",
+						"          Fromdate as date,",
+						"          Todate as date,",
+						"          Designation as string",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          emp_id,",
+						"          Name,",
+						"          contact,",
+						"          Location,",
+						"          Designation = desginaion",
+						"     )) ~> sinkNew",
+						"alterRow1 sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          SCD_Key as integer,",
+						"          emp_id as integer,",
+						"          Name as string,",
+						"          contact as long,",
+						"          Location as string,",
+						"          isactive as integer,",
+						"          Fromdate as date,",
+						"          Todate as date,",
+						"          Designation as string",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:false,",
+						"     updateable:true,",
+						"     upsertable:false,",
+						"     keys:['SCD_Key'],",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          SCD_Key,",
+						"          isactive,",
+						"          Todate",
+						"     )) ~> sinkcloseRecord",
+						"split2@Oldnotmatching sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          SCD_Key as integer,",
+						"          emp_id as integer,",
+						"          Name as string,",
+						"          contact as long,",
+						"          Location as string,",
+						"          isactive as integer,",
+						"          Fromdate as date,",
+						"          Todate as date,",
+						"          Designation as string",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          emp_id = Scr_emp_id,",
+						"          Name = Scr_Name,",
+						"          Designation = Scr_desginaion,",
+						"          contact = Scr_contact,",
+						"          Location = Scr_Location",
+						"     )) ~> sinkupdateRecord"
+					]
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Sql2Blob_Empdf')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"folder": {
+					"name": "Sql2Blob_ETL"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "RawEmp_DS",
+								"type": "DatasetReference"
+							},
+							"name": "SourceEmp"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "Empsink_ds",
+								"type": "DatasetReference"
+							},
+							"name": "sinkEmp"
+						}
+					],
+					"transformations": [
+						{
+							"name": "filter1"
+						},
+						{
+							"name": "RemoveUnwanted"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          SCD_Key as short,",
+						"          emp_id as short,",
+						"          Name as string,",
+						"          contact as long,",
+						"          Location as string,",
+						"          isactive as boolean,",
+						"          Fromdate as date,",
+						"          Todate as date,",
+						"          Designation as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> SourceEmp",
+						"SourceEmp filter(equals(isactive,true())) ~> filter1",
+						"filter1 select(mapColumn(",
+						"          emp_id,",
+						"          Name,",
+						"          contact,",
+						"          Location,",
+						"          Designation",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> RemoveUnwanted",
+						"RemoveUnwanted sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     mapColumn(",
+						"          emp_id,",
+						"          Name,",
+						"          contact,",
+						"          Location,",
+						"          Designation",
+						"     )) ~> sinkEmp"
+					]
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/EMP_Raw2Proce_pipeline')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Data flow1",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "Sql2Blob_Empdf",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"SourceEmp": {
+										"EmpSourceDate": {
+											"value": "@utcNow()",
+											"type": "Expression"
+										}
+									},
+									"sinkEmp": {
+										"EmpSinkDate": "@utcNow()"
+									}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-07-09T17:12:09Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/Sql2Blob_Empdf')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Proc2Refind_pipeline')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Data flow1",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "Proc2Refind_dataflow",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"sourceSales": {
+										"date": {
+											"value": "@utcNow()",
+											"type": "Expression"
+										}
+									},
+									"sourceTeritory": {
+										"date": "@utcNow()"
+									},
+									"sink2Ref": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-07-10T14:09:46Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/Proc2Refind_dataflow')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Raw2Proce_Salespipeline')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Data flow1",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "Raw2proces_sales",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"SourceSales": {
+										"SalesDate": {
+											"value": "@utcNow()",
+											"type": "Expression"
+										}
+									},
+									"sinksales": {
+										"SalesDate": "@utcNow()"
+									}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-07-09T17:37:53Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/Raw2proces_sales')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Raw2proc_Prod_pipeline')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Data flow1",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "Raw2proces_procd",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"SourceProduct": {
+										"ProSinkDate": {
+											"value": "@utcNow()",
+											"type": "Expression"
+										}
+									},
+									"sinkProduct": {
+										"ProSinkDate": "@utcNow()"
+									}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-07-09T17:04:24Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/Raw2proces_procd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCD_TYPE1_SURROGATE')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Data flow1",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "SCD_TYPE1_SURROGATE",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"FactTablesource": {},
+									"Maxvalue": {},
+									"DimentionTable": {},
+									"sink1": {},
+									"sink2DW": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-07-01T15:04:41Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/SCD_TYPE1_SURROGATE')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCD_TYPE2_Surrogatekey')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Data flow1",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "SCD_TYPE2_Surrogatekey",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"FactTable": {},
+									"DimentionTable": {},
+									"DesMaxvalue": {},
+									"sinkMax": {},
+									"sinkNew": {},
+									"sinkcloseRecord": {},
+									"sinkupdateRecord": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-07-02T16:37:53Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/SCD_TYPE2_Surrogatekey')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCD_Type1')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Data flow1",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "SCD_TYPE1",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"source": {},
+									"sink1": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-06-30T09:58:27Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/SCD_TYPE1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Teritory_Raw2Proce_pipeline')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Data flow1",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "Raw2proces_Territorry",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"SourceTeritory": {
+										"date": {
+											"value": "@utcNow()",
+											"type": "Expression"
+										}
+									},
+									"sinkTeritory": {
+										"date": "@utcNow()"
+									}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2026-07-10T09:12:00Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/Raw2proces_Territorry')]"
+			]
+		}
+	]
+}
