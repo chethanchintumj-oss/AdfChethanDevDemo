@@ -1,0 +1,25 @@
+{
+	"name": "Dailytrigger",
+	"properties": {
+		"description": "This pipeline activity will be performed automatically everyday evening at 5",
+		"annotations": [],
+		"runtimeState": "Started",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "ADF_ETL_pipeline",
+					"type": "PipelineReference"
+				}
+			}
+		],
+		"type": "ScheduleTrigger",
+		"typeProperties": {
+			"recurrence": {
+				"frequency": "Day",
+				"interval": 1,
+				"startTime": "2026-07-13T17:00:00",
+				"timeZone": "India Standard Time"
+			}
+		}
+	}
+}
