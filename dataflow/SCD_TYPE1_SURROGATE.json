@@ -1,0 +1,174 @@
+{
+	"name": "SCD_TYPE1_SURROGATE",
+	"properties": {
+		"folder": {
+			"name": "SCD"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "DS_Storage",
+						"type": "DatasetReference"
+					},
+					"name": "FactTablesource"
+				},
+				{
+					"dataset": {
+						"referenceName": "AzureSql_DS",
+						"type": "DatasetReference"
+					},
+					"name": "Maxvalue"
+				},
+				{
+					"dataset": {
+						"referenceName": "AzureSql_DS",
+						"type": "DatasetReference"
+					},
+					"name": "DimentionTable"
+				}
+			],
+			"sinks": [
+				{
+					"name": "sink1"
+				},
+				{
+					"dataset": {
+						"referenceName": "AzureSql_DS",
+						"type": "DatasetReference"
+					},
+					"name": "sink2DW"
+				}
+			],
+			"transformations": [
+				{
+					"name": "RenameSource"
+				},
+				{
+					"name": "LeftJoin1"
+				},
+				{
+					"name": "UpdateRecords"
+				},
+				{
+					"name": "NewRecords"
+				},
+				{
+					"name": "surrogateKey1"
+				},
+				{
+					"name": "updatedSurrogatekey"
+				},
+				{
+					"name": "RenameNewRecord"
+				},
+				{
+					"name": "RenameUpdateRecords"
+				},
+				{
+					"name": "unionAll"
+				},
+				{
+					"name": "alterRow1"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          SalesTerritoryKey as integer,",
+				"          Region as string,",
+				"          Country as string,",
+				"          Continent as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> FactTablesource",
+				"source(output(",
+				"          maxvalue as integer",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'SELECT MAX(Surrogate_key) as maxvalue from Territory',",
+				"     format: 'query') ~> Maxvalue",
+				"source(output(",
+				"          SalesTerritoryKey as integer,",
+				"          Region as string,",
+				"          Country as string,",
+				"          Continent as string,",
+				"          Surrogate_key as integer",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> DimentionTable",
+				"FactTablesource select(mapColumn(",
+				"          Scr_SalesTerritoryKey = SalesTerritoryKey,",
+				"          Scr_Region = Region,",
+				"          Scr_Country = Country,",
+				"          Scr_Continent = Continent",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> RenameSource",
+				"RenameSource, DimentionTable join(Scr_SalesTerritoryKey == SalesTerritoryKey,",
+				"     joinType:'left',",
+				"     matchType:'exact',",
+				"     ignoreSpaces: false,",
+				"     broadcast: 'auto')~> LeftJoin1",
+				"LeftJoin1 filter(not(isNull(SalesTerritoryKey))) ~> UpdateRecords",
+				"LeftJoin1 filter(isNull(SalesTerritoryKey)) ~> NewRecords",
+				"NewRecords keyGenerate(output(Surrogate_key as long),",
+				"     startAt: 1L,",
+				"     stepValue: 1L) ~> surrogateKey1",
+				"surrogateKey1 derive(Surrogate_key = case(isNull(sink1#outputs()[1].maxvalue),0,toInteger(sink1#outputs()[1].maxvalue+Surrogate_key))) ~> updatedSurrogatekey",
+				"updatedSurrogatekey select(mapColumn(",
+				"          SalesTerritoryKey = Scr_SalesTerritoryKey,",
+				"          Region = Scr_Region,",
+				"          Country = Scr_Country,",
+				"          Continent = Scr_Continent,",
+				"          Surrogate_key",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> RenameNewRecord",
+				"UpdateRecords select(mapColumn(",
+				"          SalesTerritoryKey = Scr_SalesTerritoryKey,",
+				"          Region = Scr_Region,",
+				"          Country = Scr_Country,",
+				"          Continent = Scr_Continent,",
+				"          Surrogate_key",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> RenameUpdateRecords",
+				"RenameUpdateRecords, RenameNewRecord union(byName: false)~> unionAll",
+				"unionAll alterRow(upsertIf(1==1)) ~> alterRow1",
+				"Maxvalue sink(validateSchema: false,",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     store: 'cache',",
+				"     format: 'inline',",
+				"     output: false,",
+				"     saveOrder: 0,",
+				"     mapColumn(",
+				"          maxvalue",
+				"     )) ~> sink1",
+				"alterRow1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          SalesTerritoryKey as integer,",
+				"          Region as string,",
+				"          Country as string,",
+				"          Continent as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:false,",
+				"     updateable:false,",
+				"     upsertable:true,",
+				"     keys:['Surrogate_key'],",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError') ~> sink2DW"
+			]
+		}
+	}
+}

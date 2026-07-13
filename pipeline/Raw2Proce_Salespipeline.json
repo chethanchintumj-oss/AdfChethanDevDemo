@@ -1,0 +1,45 @@
+{
+	"name": "Raw2Proce_Salespipeline",
+	"properties": {
+		"activities": [
+			{
+				"name": "Data flow1",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "Raw2proces_sales",
+						"type": "DataFlowReference",
+						"datasetParameters": {
+							"SourceSales": {
+								"SalesDate": {
+									"value": "@utcNow()",
+									"type": "Expression"
+								}
+							},
+							"sinksales": {
+								"SalesDate": "@utcNow()"
+							}
+						}
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			}
+		],
+		"annotations": [],
+		"lastPublishTime": "2026-07-09T17:37:53Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

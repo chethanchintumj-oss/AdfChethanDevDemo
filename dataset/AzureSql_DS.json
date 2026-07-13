@@ -1,0 +1,38 @@
+{
+	"name": "AzureSql_DS",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureSqlDatabase_LS",
+			"type": "LinkedServiceReference"
+		},
+		"folder": {
+			"name": "SCD"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "SalesTerritoryKey",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "Region",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Country",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Continent",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "Territory"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

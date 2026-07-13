@@ -1,0 +1,258 @@
+{
+	"name": "SCD_TYPE2_Surrogatekey",
+	"properties": {
+		"folder": {
+			"name": "SCD"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "SCD_Type2_GenDS",
+						"type": "DatasetReference"
+					},
+					"name": "FactTable"
+				},
+				{
+					"dataset": {
+						"referenceName": "SCDtype2Sql_DS",
+						"type": "DatasetReference"
+					},
+					"name": "DimentionTable"
+				},
+				{
+					"dataset": {
+						"referenceName": "SCDtype2Sql_DS",
+						"type": "DatasetReference"
+					},
+					"name": "DesMaxvalue"
+				}
+			],
+			"sinks": [
+				{
+					"name": "sinkMax"
+				},
+				{
+					"dataset": {
+						"referenceName": "SCDtype2Sql_DS",
+						"type": "DatasetReference"
+					},
+					"name": "sinkNew"
+				},
+				{
+					"dataset": {
+						"referenceName": "SCDtype2Sql_DS",
+						"type": "DatasetReference"
+					},
+					"name": "sinkcloseRecord"
+				},
+				{
+					"dataset": {
+						"referenceName": "SCDtype2Sql_DS",
+						"type": "DatasetReference"
+					},
+					"name": "sinkupdateRecord"
+				}
+			],
+			"transformations": [
+				{
+					"name": "RenameScr"
+				},
+				{
+					"name": "leftJoin1"
+				},
+				{
+					"name": "split1"
+				},
+				{
+					"name": "RenameNewRow"
+				},
+				{
+					"name": "LeftJoin2"
+				},
+				{
+					"name": "split2"
+				},
+				{
+					"name": "Removecloser"
+				},
+				{
+					"name": "Columncloser"
+				},
+				{
+					"name": "alterRow1"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          emp_id as integer,",
+				"          Name as string,",
+				"          desginaion as string,",
+				"          contact as string,",
+				"          Location as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> FactTable",
+				"source(output(",
+				"          SCD_Key as integer,",
+				"          emp_id as integer,",
+				"          Name as string,",
+				"          contact as long,",
+				"          Location as string,",
+				"          isactive as integer,",
+				"          Fromdate as date,",
+				"          Todate as date,",
+				"          Designation as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'SELECT * FROM Employee WHERE \\nisactive=1',",
+				"     format: 'query') ~> DimentionTable",
+				"source(output(",
+				"          max as integer",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'SELECT max(SCD_key) as max FROM Employee',",
+				"     format: 'query') ~> DesMaxvalue",
+				"FactTable select(mapColumn(",
+				"          Scr_emp_id = emp_id,",
+				"          Scr_Name = Name,",
+				"          Scr_desginaion = desginaion,",
+				"          Scr_contact = contact,",
+				"          Scr_Location = Location",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> RenameScr",
+				"RenameScr, DimentionTable join(Scr_emp_id == emp_id,",
+				"     joinType:'left',",
+				"     matchType:'exact',",
+				"     ignoreSpaces: false,",
+				"     broadcast: 'right')~> leftJoin1",
+				"leftJoin1 split(Scr_emp_id==emp_id,",
+				"     disjoint: false) ~> split1@(oldRecord, NewRecord)",
+				"split1@NewRecord select(mapColumn(",
+				"          emp_id = Scr_emp_id,",
+				"          Name = Scr_Name,",
+				"          desginaion = Scr_desginaion,",
+				"          contact = Scr_contact,",
+				"          Location = Scr_Location",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> RenameNewRow",
+				"split1@oldRecord, DimentionTable join(Scr_emp_id == DimentionTable@emp_id",
+				"     && Scr_Location == DimentionTable@Location,",
+				"     joinType:'left',",
+				"     matchType:'exact',",
+				"     ignoreSpaces: false,",
+				"     broadcast: 'right')~> LeftJoin2",
+				"LeftJoin2 split(Scr_Location==DimentionTable@Location,",
+				"     disjoint: false) ~> split2@(Oldmatching, Oldnotmatching)",
+				"Columncloser select(mapColumn(",
+				"          isactive,",
+				"          Todate,",
+				"          SCD_Key = split2@Oldnotmatching@SCD_Key",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> Removecloser",
+				"split2@Oldnotmatching derive(isactive = 0,",
+				"          Todate = currentDate('UIT')) ~> Columncloser",
+				"Removecloser alterRow(updateIf(true())) ~> alterRow1",
+				"DesMaxvalue sink(validateSchema: false,",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     store: 'cache',",
+				"     format: 'inline',",
+				"     output: false,",
+				"     saveOrder: 1) ~> sinkMax",
+				"RenameNewRow sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          SCD_Key as integer,",
+				"          emp_id as integer,",
+				"          Name as string,",
+				"          contact as long,",
+				"          Location as string,",
+				"          isactive as integer,",
+				"          Fromdate as date,",
+				"          Todate as date,",
+				"          Designation as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          emp_id,",
+				"          Name,",
+				"          contact,",
+				"          Location,",
+				"          Designation = desginaion",
+				"     )) ~> sinkNew",
+				"alterRow1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          SCD_Key as integer,",
+				"          emp_id as integer,",
+				"          Name as string,",
+				"          contact as long,",
+				"          Location as string,",
+				"          isactive as integer,",
+				"          Fromdate as date,",
+				"          Todate as date,",
+				"          Designation as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:false,",
+				"     updateable:true,",
+				"     upsertable:false,",
+				"     keys:['SCD_Key'],",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          SCD_Key,",
+				"          isactive,",
+				"          Todate",
+				"     )) ~> sinkcloseRecord",
+				"split2@Oldnotmatching sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          SCD_Key as integer,",
+				"          emp_id as integer,",
+				"          Name as string,",
+				"          contact as long,",
+				"          Location as string,",
+				"          isactive as integer,",
+				"          Fromdate as date,",
+				"          Todate as date,",
+				"          Designation as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          emp_id = Scr_emp_id,",
+				"          Name = Scr_Name,",
+				"          Designation = Scr_desginaion,",
+				"          contact = Scr_contact,",
+				"          Location = Scr_Location",
+				"     )) ~> sinkupdateRecord"
+			]
+		}
+	}
+}

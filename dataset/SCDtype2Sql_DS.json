@@ -1,0 +1,61 @@
+{
+	"name": "SCDtype2Sql_DS",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureSqlDatabase_LS",
+			"type": "LinkedServiceReference"
+		},
+		"folder": {
+			"name": "SCD"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "SCD_Key",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "emp_id",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "Name",
+				"type": "varchar"
+			},
+			{
+				"name": "contact",
+				"type": "bigint",
+				"precision": 19
+			},
+			{
+				"name": "Location",
+				"type": "varchar"
+			},
+			{
+				"name": "isactive",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "Fromdate",
+				"type": "date"
+			},
+			{
+				"name": "Todate",
+				"type": "date"
+			},
+			{
+				"name": "Designation",
+				"type": "varchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "Employee"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

@@ -1,0 +1,76 @@
+{
+	"name": "Raw2proces_sales",
+	"properties": {
+		"folder": {
+			"name": "Sql2Blob_ETL"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "Raw2proc_SalesDS",
+						"type": "DatasetReference"
+					},
+					"name": "SourceSales"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "SalesSink_DS",
+						"type": "DatasetReference"
+					},
+					"name": "sinksales"
+				}
+			],
+			"transformations": [
+				{
+					"name": "derivedColumnSales"
+				},
+				{
+					"name": "selectRemoveUnwanted"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          OrderDate as date,",
+				"          StockDate as date,",
+				"          OrderNumber as integer,",
+				"          QTY as short,",
+				"          Sales as integer,",
+				"          TerritoryKey as short,",
+				"          OrderLineItem as boolean,",
+				"          OrderQuantity as boolean",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> SourceSales",
+				"SourceSales derive(Total_Sales = toFloat(multiply(QTY, Sales))) ~> derivedColumnSales",
+				"derivedColumnSales select(mapColumn(",
+				"          OrderDate,",
+				"          QTY,",
+				"          Sales,",
+				"          TerritoryKey,",
+				"          Total_Sales",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> selectRemoveUnwanted",
+				"selectRemoveUnwanted sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     mapColumn(",
+				"          OrderDate,",
+				"          QTY,",
+				"          Sales,",
+				"          TerritoryKey,",
+				"          Total_Sales",
+				"     )) ~> sinksales"
+			]
+		}
+	}
+}

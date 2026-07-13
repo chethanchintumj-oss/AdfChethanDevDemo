@@ -1,0 +1,101 @@
+{
+	"name": "Proc2Refind_dataflow",
+	"properties": {
+		"folder": {
+			"name": "Sql2Blob_ETL"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "SalesProc2Refin_DS",
+						"type": "DatasetReference"
+					},
+					"name": "sourceSales"
+				},
+				{
+					"dataset": {
+						"referenceName": "TeritoryProc2Refind_DS",
+						"type": "DatasetReference"
+					},
+					"name": "sourceTeritory"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "Proc2Refind_DS",
+						"type": "DatasetReference"
+					},
+					"name": "sink2Ref"
+				}
+			],
+			"transformations": [
+				{
+					"name": "LeftjoinSales2Teritory"
+				},
+				{
+					"name": "selectandRemove"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          OrderDate as date,",
+				"          QTY as short,",
+				"          Sales as short,",
+				"          TerritoryKey as short,",
+				"          Total_Sales as double",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> sourceSales",
+				"source(output(",
+				"          SalesTerritoryKey as short,",
+				"          Region as string,",
+				"          Country as string,",
+				"          Continent as string,",
+				"          Surrogate_key as short",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> sourceTeritory",
+				"sourceSales, sourceTeritory join(TerritoryKey == SalesTerritoryKey,",
+				"     joinType:'left',",
+				"     matchType:'exact',",
+				"     ignoreSpaces: false,",
+				"     broadcast: 'auto')~> LeftjoinSales2Teritory",
+				"LeftjoinSales2Teritory select(mapColumn(",
+				"          OrderDate,",
+				"          QTY,",
+				"          Sales,",
+				"          Total_Sales,",
+				"          SalesTerritoryKey,",
+				"          Region,",
+				"          Country,",
+				"          Continent",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> selectandRemove",
+				"selectandRemove sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     filePattern:(toString((currentDate('utc')))),",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     mapColumn(",
+				"          OrderDate,",
+				"          QTY,",
+				"          Sales,",
+				"          Total_Sales,",
+				"          SalesTerritoryKey,",
+				"          Region,",
+				"          Country,",
+				"          Continent",
+				"     )) ~> sink2Ref"
+			]
+		}
+	}
+}

@@ -1,0 +1,77 @@
+{
+	"name": "Sql2Blob_Empdf",
+	"properties": {
+		"folder": {
+			"name": "Sql2Blob_ETL"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "RawEmp_DS",
+						"type": "DatasetReference"
+					},
+					"name": "SourceEmp"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "Empsink_ds",
+						"type": "DatasetReference"
+					},
+					"name": "sinkEmp"
+				}
+			],
+			"transformations": [
+				{
+					"name": "filter1"
+				},
+				{
+					"name": "RemoveUnwanted"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          SCD_Key as short,",
+				"          emp_id as short,",
+				"          Name as string,",
+				"          contact as long,",
+				"          Location as string,",
+				"          isactive as boolean,",
+				"          Fromdate as date,",
+				"          Todate as date,",
+				"          Designation as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> SourceEmp",
+				"SourceEmp filter(equals(isactive,true())) ~> filter1",
+				"filter1 select(mapColumn(",
+				"          emp_id,",
+				"          Name,",
+				"          contact,",
+				"          Location,",
+				"          Designation",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> RemoveUnwanted",
+				"RemoveUnwanted sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     mapColumn(",
+				"          emp_id,",
+				"          Name,",
+				"          contact,",
+				"          Location,",
+				"          Designation",
+				"     )) ~> sinkEmp"
+			]
+		}
+	}
+}

@@ -1,0 +1,53 @@
+{
+	"name": "Raw2proces_procd",
+	"properties": {
+		"folder": {
+			"name": "Sql2Blob_ETL"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "Prod_source_DS",
+						"type": "DatasetReference"
+					},
+					"name": "SourceProduct"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "prod_sinkDS",
+						"type": "DatasetReference"
+					},
+					"name": "sinkProduct"
+				}
+			],
+			"transformations": [],
+			"scriptLines": [
+				"source(output(",
+				"          ProductCategoryKey as short,",
+				"          CategoryName as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> SourceProduct",
+				"SourceProduct sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          emp_id as string,",
+				"          Name as string,",
+				"          contact as string,",
+				"          Location as string,",
+				"          Designation as string",
+				"     ),",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> sinkProduct"
+			]
+		}
+	}
+}
